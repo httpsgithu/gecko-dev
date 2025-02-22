@@ -92,6 +92,15 @@ float3x2 GetMatmOnBaz(Baz obj) {
 We also emit an analogous `Set` function, as well as functions for
 accessing individual columns by dynamic index.
 
+## Sampler Handling
+
+Due to limitations in how sampler heaps work in D3D12, we need to access samplers
+through a layer of indirection. Instead of directly binding samplers, we bind the entire
+sampler heap as both a standard and a comparison sampler heap. We then use a sampler
+index buffer for each bind group. This buffer is accessed in the shader to get the actual
+sampler index within the heap. See the wgpu_hal dx12 backend documentation for more
+information.
+
 [hlsl]: https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl
 [ilov]: https://gpuweb.github.io/gpuweb/wgsl/#internal-value-layout
 [16bb]: https://github.com/microsoft/DirectXShaderCompiler/wiki/Buffer-Packing#constant-buffer-packing
@@ -101,6 +110,7 @@ accessing individual columns by dynamic index.
 mod conv;
 mod help;
 mod keywords;
+mod ray;
 mod storage;
 mod writer;
 
@@ -109,14 +119,34 @@ use thiserror::Error;
 
 use crate::{back, proc};
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serialize", derive(serde::Serialize))]
 #[cfg_attr(feature = "deserialize", derive(serde::Deserialize))]
 pub struct BindTarget {
     pub space: u8,
+    /// For regular bindings this is the register number.
+    ///
+    /// For sampler bindings, this is the index to use into the bind group's sampler index buffer.
     pub register: u32,
     /// If the binding is an unsized binding array, this overrides the size.
     pub binding_array_size: Option<u32>,
+    /// This is the index in the buffer at [`Options::dynamic_storage_buffer_offsets_targets`].
+    pub dynamic_storage_buffer_offsets_index: Option<u32>,
+    /// This is a hint that we need to restrict indexing of vectors, matrices and arrays.
+    ///
+    /// If [`Options::restrict_indexing`] is also `true`, we will restrict indexing.
+    #[cfg_attr(any(feature = "serialize", feature = "deserialize"), serde(default))]
+    pub restrict_indexing: bool,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serialize", derive(serde::Serialize))]
+#[cfg_attr(feature = "deserialize", derive(serde::Deserialize))]
+/// BindTarget for dynamic storage buffer offsets
+pub struct OffsetsBindTarget {
+    pub space: u8,
+    pub register: u32,
+    pub size: u32,
 }
 
 // Using `BTreeMap` instead of `HashMap` so that we can hash itself.
@@ -131,6 +161,13 @@ pub enum ShaderModel {
     V5_0,
     V5_1,
     V6_0,
+    V6_1,
+    V6_2,
+    V6_3,
+    V6_4,
+    V6_5,
+    V6_6,
+    V6_7,
 }
 
 impl ShaderModel {
@@ -139,6 +176,13 @@ impl ShaderModel {
             Self::V5_0 => "5_0",
             Self::V5_1 => "5_1",
             Self::V6_0 => "6_0",
+            Self::V6_1 => "6_1",
+            Self::V6_2 => "6_2",
+            Self::V6_3 => "6_3",
+            Self::V6_4 => "6_4",
+            Self::V6_5 => "6_5",
+            Self::V6_6 => "6_6",
+            Self::V6_7 => "6_7",
         }
     }
 }
@@ -164,6 +208,47 @@ impl crate::ImageDimension {
     }
 }
 
+#[derive(Clone, Copy, Debug, Hash, Eq, Ord, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "serialize", derive(serde::Serialize))]
+#[cfg_attr(feature = "deserialize", derive(serde::Deserialize))]
+pub struct SamplerIndexBufferKey {
+    pub group: u32,
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[cfg_attr(feature = "serialize", derive(serde::Serialize))]
+#[cfg_attr(feature = "deserialize", derive(serde::Deserialize))]
+#[cfg_attr(feature = "deserialize", serde(default))]
+pub struct SamplerHeapBindTargets {
+    pub standard_samplers: BindTarget,
+    pub comparison_samplers: BindTarget,
+}
+
+impl Default for SamplerHeapBindTargets {
+    fn default() -> Self {
+        Self {
+            standard_samplers: BindTarget {
+                space: 0,
+                register: 0,
+                binding_array_size: None,
+                dynamic_storage_buffer_offsets_index: None,
+                restrict_indexing: false,
+            },
+            comparison_samplers: BindTarget {
+                space: 1,
+                register: 0,
+                binding_array_size: None,
+                dynamic_storage_buffer_offsets_index: None,
+                restrict_indexing: false,
+            },
+        }
+    }
+}
+
+// We use a BTreeMap here so that we can hash it.
+pub type SamplerIndexBufferBindingMap =
+    std::collections::BTreeMap<SamplerIndexBufferKey, BindTarget>;
+
 /// Shorthand result used internally by the backend
 type BackendResult = Result<(), Error>;
 
@@ -179,6 +264,7 @@ pub enum EntryPointError {
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serialize", derive(serde::Serialize))]
 #[cfg_attr(feature = "deserialize", derive(serde::Deserialize))]
+#[cfg_attr(feature = "deserialize", serde(default))]
 pub struct Options {
     /// The hlsl shader model to be used
     pub shader_model: ShaderModel,
@@ -191,8 +277,19 @@ pub struct Options {
     pub special_constants_binding: Option<BindTarget>,
     /// Bind target of the push constant buffer
     pub push_constants_target: Option<BindTarget>,
+    /// Bind target of the sampler heap and comparison sampler heap.
+    pub sampler_heap_target: SamplerHeapBindTargets,
+    /// Mapping of each bind group's sampler index buffer to a bind target.
+    pub sampler_buffer_binding_map: SamplerIndexBufferBindingMap,
+    /// Bind target for dynamic storage buffer offsets
+    pub dynamic_storage_buffer_offsets_targets: std::collections::BTreeMap<u32, OffsetsBindTarget>,
     /// Should workgroup variables be zero initialized (by polyfilling)?
     pub zero_initialize_workgroup_memory: bool,
+    /// Should we restrict indexing of vectors, matrices and arrays?
+    pub restrict_indexing: bool,
+    /// If set, loops will have code injected into them, forcing the compiler
+    /// to think the number of iterations is bounded.
+    pub force_loop_bounding: bool,
 }
 
 impl Default for Options {
@@ -202,8 +299,13 @@ impl Default for Options {
             binding_map: BindingMap::default(),
             fake_missing_bindings: true,
             special_constants_binding: None,
+            sampler_heap_target: SamplerHeapBindTargets::default(),
+            sampler_buffer_binding_map: std::collections::BTreeMap::default(),
             push_constants_target: None,
+            dynamic_storage_buffer_offsets_targets: std::collections::BTreeMap::new(),
             zero_initialize_workgroup_memory: true,
+            restrict_indexing: true,
+            force_loop_bounding: true,
         }
     }
 }
@@ -214,13 +316,15 @@ impl Options {
         res_binding: &crate::ResourceBinding,
     ) -> Result<BindTarget, EntryPointError> {
         match self.binding_map.get(res_binding) {
-            Some(target) => Ok(target.clone()),
+            Some(target) => Ok(*target),
             None if self.fake_missing_bindings => Ok(BindTarget {
                 space: res_binding.group as u8,
                 register: res_binding.binding,
                 binding_array_size: None,
+                dynamic_storage_buffer_offsets_index: None,
+                restrict_indexing: false,
             }),
-            None => Err(EntryPointError::MissingBinding(res_binding.clone())),
+            None => Err(EntryPointError::MissingBinding(*res_binding)),
         }
     }
 }
@@ -241,21 +345,32 @@ pub struct ReflectionInfo {
 pub enum Error {
     #[error(transparent)]
     IoError(#[from] FmtError),
-    #[error("A scalar with an unsupported width was requested: {0:?} {1:?}")]
-    UnsupportedScalar(crate::ScalarKind, crate::Bytes),
+    #[error("A scalar with an unsupported width was requested: {0:?}")]
+    UnsupportedScalar(crate::Scalar),
     #[error("{0}")]
     Unimplemented(String), // TODO: Error used only during development
     #[error("{0}")]
     Custom(String),
+    #[error("overrides should not be present at this stage")]
+    Override,
 }
 
 #[derive(Default)]
 struct Wrapped {
+    zero_values: crate::FastHashSet<help::WrappedZeroValue>,
     array_lengths: crate::FastHashSet<help::WrappedArrayLength>,
     image_queries: crate::FastHashSet<help::WrappedImageQuery>,
+    image_load_scalars: crate::FastHashSet<crate::Scalar>,
     constructors: crate::FastHashSet<help::WrappedConstructor>,
     struct_matrix_access: crate::FastHashSet<help::WrappedStructMatrixAccess>,
     mat_cx2s: crate::FastHashSet<help::WrappedMatCx2>,
+    math: crate::FastHashSet<help::WrappedMath>,
+    unary_op: crate::FastHashSet<help::WrappedUnaryOp>,
+    binary_op: crate::FastHashSet<help::WrappedBinaryOp>,
+    /// If true, the sampler heaps have been written out.
+    sampler_heaps: bool,
+    // Mapping from SamplerIndexBufferKey to the name the namer returned.
+    sampler_index_buffers: crate::FastHashMap<SamplerIndexBufferKey, String>,
 }
 
 impl Wrapped {
@@ -265,6 +380,38 @@ impl Wrapped {
         self.constructors.clear();
         self.struct_matrix_access.clear();
         self.mat_cx2s.clear();
+        self.math.clear();
+        self.unary_op.clear();
+        self.binary_op.clear();
+    }
+}
+
+/// A fragment entry point to be considered when generating HLSL for the output interface of vertex
+/// entry points.
+///
+/// This is provided as an optional parameter to [`Writer::write`].
+///
+/// If this is provided, vertex outputs will be removed if they are not inputs of this fragment
+/// entry point. This is necessary for generating correct HLSL when some of the vertex shader
+/// outputs are not consumed by the fragment shader.
+pub struct FragmentEntryPoint<'a> {
+    module: &'a crate::Module,
+    func: &'a crate::Function,
+}
+
+impl<'a> FragmentEntryPoint<'a> {
+    /// Returns `None` if the entry point with the provided name can't be found or isn't a fragment
+    /// entry point.
+    pub fn new(module: &'a crate::Module, ep_name: &'a str) -> Option<Self> {
+        module
+            .entry_points
+            .iter()
+            .find(|ep| ep.name == ep_name)
+            .filter(|ep| ep.stage == crate::ShaderStage::Fragment)
+            .map(|ep| Self {
+                module,
+                func: &ep.function,
+            })
     }
 }
 
@@ -279,6 +426,9 @@ pub struct Writer<'a, W> {
     /// Set of expressions that have associated temporary variables
     named_expressions: crate::NamedExpressions,
     wrapped: Wrapped,
+    written_committed_intersection: bool,
+    written_candidate_intersection: bool,
+    continue_ctx: back::continue_forward::ContinueCtx,
 
     /// A reference to some part of a global variable, lowered to a series of
     /// byte offset calculations.

@@ -13,6 +13,7 @@ config = {
             "platforms": [
                 "linux",
                 "linux64",
+                "linux64-aarch64",
                 "osx",
                 "win",
                 "win64",
@@ -35,6 +36,7 @@ config = {
             "platforms": [
                 "linux",
                 "linux64",
+                "linux64-aarch64",
                 "osx",
                 "win",
                 "win64",
@@ -71,6 +73,7 @@ config = {
             "platforms": [
                 "win",
                 "win64",
+                "win64-aarch64",
             ],
         },
         "msix-latest": {
@@ -78,6 +81,7 @@ config = {
             "platforms": [
                 "win",
                 "win64",
+                "win64-aarch64",
             ],
         },
         "stub-installer": {
@@ -101,6 +105,7 @@ config = {
             "platforms": [
                 "linux",
                 "linux64",
+                "linux64-aarch64",
                 "osx",
                 "win",
                 "win64",

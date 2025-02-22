@@ -1,35 +1,35 @@
 {
   "data": [
     {
-      "stash": {
-        "blocked": [
-          "{ccfde610-0cd9-4a4b-b03e-362aec492239}:0.0.1",
-          "{8401194a-ebdb-4b6c-8129-40537084bc6f}:1.0.9",
-          "{ccfde610-0cd9-4a4b-b03e-362aec492239}:0.0.2"
-        ],
-        "unblocked": []
-      },
-      "schema": 1690223886266,
-      "key_format": "{guid}:{version}",
-      "stash_time": 1690828512515,
-      "id": "a3ab36e0-93f6-4d65-a2ff-b5ddee65b161",
-      "last_modified": 1690828579402
-    },
-    {
-      "schema": 1690223885451,
+      "schema": 1739277368345,
       "attachment": {
-        "hash": "9c890391b90d43bf692755185bfa1780ee051467ae9a2775759d9866f4546664",
-        "size": 817083,
+        "hash": "2456074c5ca73b46f67d552580e82f5da8ea6cc524cb09d283a036936d793173",
+        "size": 852137,
         "filename": "filter.bin",
-        "location": "staging/addons-bloomfilters/6c7d9b78-4642-461c-9b2d-b802ccd7a1d5.bin",
+        "location": "staging/addons-bloomfilters/b8643575-1c88-433b-9259-3c864e435916.bin",
         "mimetype": "application/octet-stream"
       },
       "key_format": "{guid}:{version}",
       "attachment_type": "bloomfilter-base",
-      "generation_time": 1690223712145,
-      "id": "69ec47cc-b148-45bf-8be8-5fc0bdc4c439",
-      "last_modified": 1690223886167
+      "generation_time": 1739466275950,
+      "id": "88946e64-c81a-42f1-9021-c608fce0b47f",
+      "last_modified": 1739466430719
+    },
+    {
+      "schema": 1739466428648,
+      "attachment": {
+        "hash": "842edc3cf92a5d32b0d08c94eeaec1152c16d191aebdfe574e8289465e6153e3",
+        "size": 9351,
+        "filename": "filter.bin",
+        "location": "staging/addons-bloomfilters/2c9dd046-c9a0-460b-8ba8-28e08cda4097.bin",
+        "mimetype": "application/octet-stream"
+      },
+      "key_format": "{guid}:{version}",
+      "attachment_type": "softblocks-bloomfilter-base",
+      "generation_time": 1739466275950,
+      "id": "08cd99e5-afd1-4cf6-bd52-ae4f67298c0a",
+      "last_modified": 1739466430716
     }
   ],
-  "timestamp": 1690828579402
+  "timestamp": 1739466430719
 }

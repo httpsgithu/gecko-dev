@@ -6,118 +6,53 @@
 ### being translated as the feature is still in heavy development
 ### and strings are likely to change often.
 
-shopping-page-title = { -brand-product-name } Shopping
-# Title for page showing where a user can check the
-# review quality of online shopping product reviews
-shopping-main-container-title = Review quality check
-shopping-close-button =
-  .title = Close
-# This string is for notifying screen reader users that the
-# sidebar is still loading data.
-shopping-a11y-loading =
-  .aria-label = Loading…
+## Opt-in message strings for Review Checker when it is integrated into the global sidebar.
 
-## Strings for the letter grade component.
-## For now, we only support letter grades A, B, C, D and F.
-## Letter A indicates the highest grade, and F indicates the lowest grade.
-## Letters are hardcoded and cannot be localized.
+shopping-opt-in-integrated-headline = Shop with confidence
+shopping-opt-in-integrated-subtitle = Turn on Review Checker in { -brand-product-name } to see how reliable product reviews are, before you buy. It uses AI technology to analyze reviews. <a data-l10n-name="learn_more">Learn more</a>
+shopping-opt-in-integrated-subtitle-unsupported-site = Review Checker from { -brand-product-name } helps you know how reliable a product’s reviews are, before you buy. It uses AI technology to analyze reviews. <a data-l10n-name="learn_more">Learn more</a>
 
-shopping-letter-grade-description-ab = Reliable reviews
-shopping-letter-grade-description-c = Only some reliable reviews
-shopping-letter-grade-description-df = Unreliable reviews
+shopping-opt-in-integrated-privacy-policy-and-terms-of-use = Review Checker is powered by { -fakespot-brand-full-name }. By selecting “{ shopping-opt-in-integrated-button }“ you agree to { -brand-product-name }’s <a data-l10n-name="privacy_policy">privacy notice</a> and { -fakespot-brand-name }’s <a data-l10n-name="terms_of_use">terms of use.</a>
+shopping-opt-in-integrated-button = Try Review Checker
 
-# This string is displayed in a tooltip that appears when the user hovers
-# over the letter grade component without a visible description.
-# It is also used for screen readers.
-#  $letter (String) - The letter grade as A, B, C, D or F (hardcoded).
-#  $description (String) - The localized letter grade description. See shopping-letter-grade-description-* strings above.
-shopping-letter-grade-tooltip =
-  .title = { $letter } - { $description }
+## Message strings for Review Checker's empty states.
 
-## Strings for the shopping message-bar
+shopping-empty-state-header = Ready to check reviews
+shopping-empty-state-supported-site = View a product and { -brand-product-name } will check if the reviews are reliable.
 
-shopping-message-bar-warning-stale-analysis-title = Updates available
-shopping-message-bar-warning-stale-analysis-message = Re-analyze the reviews for this product, so you have the latest info.
-shopping-message-bar-warning-stale-analysis-link = Re-analyze reviews
+# We show a list of sites supported by Review Checker whenever a user opens the feature in an unsupported site.
+# This string will be displayed above the list of sites. The list will be hardcoded and does not require localization.
+shopping-empty-state-non-supported-site = Review Checker works when you shop on:
 
-shopping-message-bar-generic-error-title = Something went wrong
-shopping-message-bar-generic-error-message = Couldn’t load information. Please try again later.
+## Confirm disabling Review Checker for newly opted out users
 
-shopping-message-bar-warning-not-enough-reviews-title = Not enough reviews yet
-shopping-message-bar-warning-not-enough-reviews-message = When this product has more reviews, we’ll be able to analyze them.
+shopping-integrated-callout-opted-out-title = Review Checker is off
+shopping-integrated-callout-opted-out-subtitle = To turn it back on, select the price tag in the sidebar and turn on Review Checker.
 
-## Strings for the product review snippets card
+## Callout for where to find Review Checker when the sidebar closes
 
-shopping-highlights-label =
-  .label = Snippets from recent reviews
+shopping-integrated-callout-sidebar-closed-title = Get back to Review Checker
+shopping-integrated-callout-sidebar-closed-subtitle = Select the price tag in the sidebar to see if you can trust a product’s reviews.
 
-shopping-highlight-price = Price
-shopping-highlight-quality = Quality
-shopping-highlight-shipping = Shipping
-shopping-highlight-competitiveness = Competitiveness
-shopping-highlight-packaging = Packaging
+## Pref confirmation callout for auto-open
 
-## Strings for the settings card
+shopping-integrated-callout-disabled-auto-open-title = Get back to Review Checker
+shopping-integrated-callout-disabled-auto-open-subtitle = Select the price tag in the sidebar to see if you can trust a product’s reviews.
+shopping-integrated-callout-no-logo-disabled-auto-open-subtitle = Select the sidebar button to see if you can trust a product’s reviews.
 
-shopping-settings-label =
-  .label = Settings
-shopping-settings-recommendations-toggle =
-  .label = Show products recommended by { -brand-product-name }
-shopping-settings-opt-out-button = Turn off review quality check
+## Auto-close toggle in settings
 
-## Strings for the adjusted rating component
+shopping-settings-auto-close-toggle =
+    .label = Automatically close Review Checker
 
-shopping-adjusted-rating-label =
-  .label = Adjusted rating
-shopping-adjusted-rating-unreliable-reviews = Unreliable reviews removed
+# Description text for regions where we support three sites. Sites are limited to Amazon, Walmart and Best Buy.
+# Variables:
+#   $firstSite (String) - The first shopping page name
+#   $secondSite (String) - The second shopping page name
+#   $thirdSite (String) - The third shopping page name
+shopping-settings-auto-close-description-three-sites = When leaving { $firstSite }, { $secondSite }, and { $thirdSite }
 
-## Strings for the review reliability component
-
-shopping-review-reliability-label =
-  .label = How reliable are these reviews?
-
-## Strings for the analysis explainer component
-
-shopping-analysis-explainer-label =
-  .label = How we determine review quality
-
-shopping-analysis-explainer-intro =
-  { -brand-product-name } uses AI technology from { -fakespot-brand-name } to analyze the quality and reliability of product reviews.
-  This is only provided to help you assess review quality, not product quality.
-
-shopping-analysis-explainer-grades-intro =
-  We assign each product’s reviews a <strong>letter grade</strong> from A to F.
-shopping-analysis-explainer-higher-grade-description =
-  A higher grade means we believe the reviews are likely from real customers who left honest, unbiased reviews.
-shopping-analysis-explainer-lower-grade-description =
-  A lower grade means we believe the reviews are likely from paid or biased reviewers.
-
-shopping-analysis-explainer-adjusted-rating-description =
-  The <strong>adjusted rating</strong> is based on review quality, with unreliable reviews removed.
-shopping-analysis-explainer-highlights-description =
-  <strong>Highlights</strong> are pulled from recent Amazon reviews (from the last 80 days), that we believe to be reliable.
-
-shopping-analysis-explainer-learn-more =
-  Learn more about <a data-l10n-name="review-quality-url">how { -fakespot-brand-name } determines review quality</a>.
-
-shopping-analysis-explainer-review-grading-scale = Review grading scale:
-shopping-analysis-explainer-review-grading-scale-reliable = We believe the reviews to be reliable
-shopping-analysis-explainer-review-grading-scale-mixed = We believe there’s a mix of reliable and unreliable reviews
-shopping-analysis-explainer-review-grading-scale-unreliable = We believe the reviews are unreliable
-
-## Strings for UrlBar button
-
-shopping-sidebar-open-button =
-  .tooltiptext = Open shopping sidebar
-shopping-sidebar-close-button =
-  .tooltiptext = Close shopping sidebar
-
-## Strings for the unanalyzed product card.
-
-shopping-unanalyzed-product-header = No analysis for these reviews yet
-shopping-unanalyzed-product-message = You’re about 60 seconds away from knowing whether you can trust the reviews for this product.
-shopping-unanalyzed-product-analyze-link = Analyze reviews
-
-## Onboarding message strings.
-
-shopping-onboarding-headline = Shop based on <b>real</b> reviews
+# Description text for regions where we support only one site (e.g. currently used in FR/DE with Amazon).
+# Variables:
+#   $currentSite (String) - The current shopping page name
+shopping-settings-auto-close-description-single-site = When leaving { $currentSite }

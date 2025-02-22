@@ -52,6 +52,7 @@
 #include "mozilla/PresShell.h"
 #include "mozilla/ProfilerLabels.h"
 #include "mozilla/RefPtr.h"
+#include "mozilla/Try.h"
 
 #include "nsXULPrototypeCache.h"
 #include "nsXULElement.h"
@@ -109,7 +110,7 @@ nsresult PrototypeDocumentContentSink::Init(Document* aDoc, nsIURI* aURI,
   mDocument->SetMayStartLayout(false);
 
   // Get the URI.  this should match the uri used for the OnNewURI call in
-  // nsDocShell::CreateContentViewer.
+  // nsDocShell::CreateDocumentViewer.
   nsresult rv = NS_GetFinalChannelURI(aChannel, getter_AddRefs(mDocumentURI));
   NS_ENSURE_SUCCESS(rv, rv);
 
@@ -174,8 +175,7 @@ void PrototypeDocumentContentSink::ContinueInterruptedParsingAsync() {
   nsCOMPtr<nsIRunnable> ev = NewRunnableMethod(
       "PrototypeDocumentContentSink::ContinueInterruptedParsingIfEnabled", this,
       &PrototypeDocumentContentSink::ContinueInterruptedParsingIfEnabled);
-
-  mDocument->Dispatch(mozilla::TaskCategory::Other, ev.forget());
+  mDocument->Dispatch(ev.forget());
 }
 
 //----------------------------------------------------------------------
@@ -453,7 +453,7 @@ nsresult PrototypeDocumentContentSink::ResumeWalk() {
     nsContentUtils::ReportToConsoleNonLocalized(
         u"Failed to load document from prototype document."_ns,
         nsIScriptError::errorFlag, "Prototype Document"_ns, mDocument,
-        mDocumentURI);
+        SourceLocation{mDocumentURI.get()});
   }
   return rv;
 }
@@ -594,10 +594,10 @@ nsresult PrototypeDocumentContentSink::ResumeWalkInternal() {
           if (piProto->mTarget.EqualsLiteral("xml-stylesheet")) {
             AutoTArray<nsString, 1> params = {piProto->mTarget};
 
-            nsContentUtils::ReportToConsole(nsIScriptError::warningFlag,
-                                            "XUL Document"_ns, nullptr,
-                                            nsContentUtils::eXUL_PROPERTIES,
-                                            "PINotInProlog", params, docURI);
+            nsContentUtils::ReportToConsole(
+                nsIScriptError::warningFlag, "XUL Document"_ns, nullptr,
+                nsContentUtils::eXUL_PROPERTIES, "PINotInProlog", params,
+                SourceLocation(docURI.get()));
           }
 
           nsIContent* parent = element.get();
@@ -651,7 +651,7 @@ nsresult PrototypeDocumentContentSink::DoneWalking() {
     mDocument->SetReadyStateInternal(Document::READYSTATE_INTERACTIVE);
     mDocument->NotifyPossibleTitleChange(false);
 
-    nsContentUtils::DispatchEventOnlyToChrome(mDocument, ToSupports(mDocument),
+    nsContentUtils::DispatchEventOnlyToChrome(mDocument, mDocument,
                                               u"MozBeforeInitialXULLayout"_ns,
                                               CanBubble::eYes, Cancelable::eNo);
   }
@@ -669,7 +669,15 @@ nsresult PrototypeDocumentContentSink::DoneWalking() {
     nsXULPrototypeCache::GetInstance()->HasPrototype(mDocumentURI,
                                                      &isCachedOnDisk);
     if (!isCachedOnDisk) {
-      nsXULPrototypeCache::GetInstance()->WritePrototype(mCurrentPrototype);
+      if (!mDocument->GetDocumentElement() ||
+          (mDocument->GetDocumentElement()->NodeInfo()->Equals(
+               nsGkAtoms::parsererror) &&
+           mDocument->GetDocumentElement()->NodeInfo()->NamespaceEquals(
+               nsDependentAtomString(nsGkAtoms::nsuri_parsererror)))) {
+        nsXULPrototypeCache::GetInstance()->RemovePrototype(mDocumentURI);
+      } else {
+        nsXULPrototypeCache::GetInstance()->WritePrototype(mCurrentPrototype);
+      }
     }
   }
 
@@ -1035,9 +1043,10 @@ nsresult PrototypeDocumentContentSink::CreateElementFromPrototype(
     const bool isRoot = !aParent;
     // If it's a XUL element, it'll be lightweight until somebody
     // monkeys with it.
-    rv = nsXULElement::CreateFromPrototype(aPrototype, doc, true, isRoot,
-                                           getter_AddRefs(result));
-    if (NS_FAILED(rv)) return rv;
+    result = nsXULElement::CreateFromPrototype(aPrototype, doc, isRoot);
+    if (!result) {
+      return NS_ERROR_OUT_OF_MEMORY;
+    }
   } else {
     // If it's not a XUL element, it's gonna be heavyweight no matter
     // what. So we need to copy everything out of the prototype

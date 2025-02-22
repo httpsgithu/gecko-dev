@@ -6,7 +6,6 @@
 import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
 
 import { PrivateBrowsingUtils } from "resource://gre/modules/PrivateBrowsingUtils.sys.mjs";
-import { TelemetryController } from "resource://gre/modules/TelemetryController.sys.mjs";
 
 const PREF_SSL_IMPACT_ROOTS = [
   "security.tls.version.",
@@ -33,7 +32,7 @@ class CaptivePortalObserver {
     Services.obs.removeObserver(this, "captive-portal-login-success");
   }
 
-  observe(aSubject, aTopic, aData) {
+  observe(aSubject, aTopic) {
     switch (aTopic) {
       case "captive-portal-login-abort":
       case "captive-portal-login-success":
@@ -72,40 +71,6 @@ export class NetErrorParent extends JSWindowActorParent {
     }
 
     return false;
-  }
-
-  async ReportBlockingError(bcID, scheme, host, port, path, xfoAndCspInfo) {
-    // For reporting X-Frame-Options error and CSP: frame-ancestors errors, We
-    // are collecting 4 pieces of information.
-    // 1. The X-Frame-Options in the response header.
-    // 2. The CSP: frame-ancestors in the response header.
-    // 3. The URI of the frame who triggers this error.
-    // 4. The top-level URI which loads the frame.
-    //
-    // We will exclude the query strings from the reporting URIs.
-    //
-    // More details about the data we send can be found in
-    // https://firefox-source-docs.mozilla.org/toolkit/components/telemetry/telemetry/data/xfocsp-error-report-ping.html
-    //
-
-    let topBC = BrowsingContext.get(bcID).top;
-    let topURI = topBC.currentWindowGlobal.documentURI;
-
-    // Get the URLs without query strings.
-    let frame_uri = `${scheme}://${host}${port == -1 ? "" : ":" + port}${path}`;
-    let top_uri = `${topURI.scheme}://${topURI.hostPort}${topURI.filePath}`;
-
-    TelemetryController.submitExternalPing(
-      "xfocsp-error-report",
-      {
-        ...xfoAndCspInfo,
-        frame_hostname: host,
-        top_hostname: topURI.host,
-        frame_uri,
-        top_uri,
-      },
-      { addClientId: false, addEnvironment: false }
-    );
   }
 
   /**
@@ -172,7 +137,7 @@ export class NetErrorParent extends JSWindowActorParent {
     request.channel.loadFlags |= Ci.nsIRequest.LOAD_BYPASS_CACHE;
     request.channel.loadFlags |= Ci.nsIRequest.INHIBIT_CACHING;
 
-    request.addEventListener("error", event => {
+    request.addEventListener("error", () => {
       // Make sure the user is still on the cert error page.
       if (!browser.documentURI.spec.startsWith("about:certerror")) {
         return;
@@ -278,27 +243,11 @@ export class NetErrorParent extends JSWindowActorParent {
       case "Browser:SSLErrorGoBack":
         this.goBackFromErrorPage(this.browser);
         break;
-      case "Browser:SSLErrorReportTelemetry":
-        let reportStatus = message.data.reportStatus;
-        Services.telemetry
-          .getHistogramById("TLS_ERROR_REPORT_UI")
-          .add(reportStatus);
-        break;
       case "GetChangedCertPrefs":
         let hasChangedCertPrefs = this.hasChangedCertPrefs();
         this.sendAsyncMessage("HasChangedCertPrefs", {
           hasChangedCertPrefs,
         });
-        break;
-      case "ReportBlockingError":
-        this.ReportBlockingError(
-          this.browsingContext.id,
-          message.data.scheme,
-          message.data.host,
-          message.data.port,
-          message.data.path,
-          message.data.xfoAndCspInfo
-        );
         break;
       case "DisplayOfflineSupportPage":
         this.displayOfflineSupportPage(message.data.supportPageSlug);

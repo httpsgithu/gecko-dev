@@ -89,22 +89,23 @@ function bluetooth_test(
   }, name, properties);
 }
 
-function bluetooth_test_crbug1430625(
+/**
+ * These tests rely on the User Agent providing an implementation of the
+ * WebDriver-Bidi for testing Web Bluetooth
+ * https://webbluetoothcg.github.io/web-bluetooth/#automated-testing
+ * @param {function{*}: Promise<*>} test_function The Web Bluetooth test to run.
+ * @param {string} name The name or description of the test.
+ * @param {object} properties An object containing extra options for the test.
+ * @param {Boolean} validate_response_consumed Whether to validate all response
+ *     consumed or not.
+ * @returns {Promise<void>} Resolves if Web Bluetooth test ran successfully, or
+ *     rejects if the test failed.
+ */
+function bluetooth_bidi_test(
   test_function, name, properties, validate_response_consumed = true) {
 return promise_test(async (t) => {
   assert_implements(navigator.bluetooth, 'missing navigator.bluetooth');
-  // Trigger Chromium-specific setup.
-  await performChromiumSetup();
-  assert_implements(
-      navigator.bluetooth.test, 'missing navigator.bluetooth.test');
-  console.log('[crbug.com/1430625] To test_function');
   await test_function(t);
-  if (validate_response_consumed) {
-    console.log('[crbug.com/1430625] To wait allResponsesConsumed');
-    let consumed = await navigator.bluetooth.test.allResponsesConsumed();
-    assert_true(consumed);
-  }
-  console.log('[crbug.com/1430625] End');
 }, name, properties);
 }
 
@@ -191,8 +192,9 @@ function assert_promise_rejects_with_message(promise, expected, description) {
       error => {
         assert_equals(error.name, expected.name, 'Unexpected Error Name:');
         if (expected.message) {
-          assert_equals(
-              error.message, expected.message, 'Unexpected Error Message:');
+          assert_true(
+              error.message.includes(expected.message),
+              'Unexpected Error Message:');
         }
       });
 }

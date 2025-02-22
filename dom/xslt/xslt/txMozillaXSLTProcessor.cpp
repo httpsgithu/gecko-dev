@@ -4,7 +4,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "txMozillaXSLTProcessor.h"
-#include "nsContentCID.h"
 #include "nsError.h"
 #include "mozilla/dom/Element.h"
 #include "mozilla/dom/Document.h"
@@ -261,9 +260,18 @@ inline void ImplCycleCollectionTraverse(
  * txMozillaXSLTProcessor
  */
 
-NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(txMozillaXSLTProcessor, mOwner,
-                                      mEmbeddedStylesheetRoot, mSource,
-                                      mVariables)
+NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE_CLASS(txMozillaXSLTProcessor)
+
+NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(txMozillaXSLTProcessor)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mOwner, mSource)
+  tmp->Reset();
+  NS_IMPL_CYCLE_COLLECTION_UNLINK_PRESERVED_WRAPPER
+NS_IMPL_CYCLE_COLLECTION_UNLINK_END
+
+NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(txMozillaXSLTProcessor)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(
+      mOwner, mStylesheetDocument, mEmbeddedStylesheetRoot, mSource, mVariables)
+NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
 NS_IMPL_CYCLE_COLLECTING_ADDREF(txMozillaXSLTProcessor)
 NS_IMPL_CYCLE_COLLECTING_RELEASE(txMozillaXSLTProcessor)
@@ -277,23 +285,17 @@ NS_INTERFACE_MAP_END
 
 txMozillaXSLTProcessor::txMozillaXSLTProcessor()
     : mOwner(nullptr),
-      mStylesheetDocument(nullptr),
       mTransformResult(NS_OK),
       mCompileResult(NS_OK),
       mFlags(0) {}
 
 txMozillaXSLTProcessor::txMozillaXSLTProcessor(nsISupports* aOwner)
     : mOwner(aOwner),
-      mStylesheetDocument(nullptr),
       mTransformResult(NS_OK),
       mCompileResult(NS_OK),
       mFlags(0) {}
 
-txMozillaXSLTProcessor::~txMozillaXSLTProcessor() {
-  if (mStylesheetDocument) {
-    mStylesheetDocument->RemoveMutationObserver(this);
-  }
-}
+txMozillaXSLTProcessor::~txMozillaXSLTProcessor() { Reset(); }
 
 NS_IMETHODIMP
 txMozillaXSLTProcessor::SetTransformObserver(nsITransformObserver* aObserver) {
@@ -331,9 +333,8 @@ class txXSLTParamContext : public txIParseContext, public txIEvalContext {
       : mResolver(aResolver), mContext(aContext), mRecycler(aRecycler) {}
 
   // txIParseContext
-  nsresult resolveNamespacePrefix(nsAtom* aPrefix, int32_t& aID) override {
-    aID = mResolver->lookupNamespace(aPrefix);
-    return aID == kNameSpaceID_Unknown ? NS_ERROR_DOM_NAMESPACE_ERR : NS_OK;
+  int32_t resolveNamespacePrefix(nsAtom* aPrefix) override {
+    return mResolver->lookupNamespace(aPrefix);
   }
   nsresult resolveFunctionCall(nsAtom* aName, int32_t aID,
                                FunctionCall** aFunction) override {
@@ -503,6 +504,10 @@ void txMozillaXSLTProcessor::ImportStylesheet(nsINode& aStyle,
     return;
   }
 
+  MOZ_ASSERT(!mEmbeddedStylesheetRoot);
+
+  mCompileResult = NS_OK;
+
   if (!nsContentUtils::SubjectPrincipalOrSystemIfNativeCaller()->Subsumes(
           aStyle.NodePrincipal())) {
     aRv.Throw(NS_ERROR_DOM_SECURITY_ERR);
@@ -548,7 +553,10 @@ already_AddRefed<Document> txMozillaXSLTProcessor::TransformToDocument(
     return nullptr;
   }
 
-  mSource = &aSource;
+  mSource = aSource.CloneNode(true, aRv);
+  if (aRv.Failed()) {
+    return nullptr;
+  }
 
   nsCOMPtr<Document> doc;
   rv = TransformToDoc(getter_AddRefs(doc), true);
@@ -716,7 +724,7 @@ nsresult txMozillaXSLTProcessor::TransformToDoc(Document** aResult,
 }
 
 already_AddRefed<DocumentFragment> txMozillaXSLTProcessor::TransformToFragment(
-    nsINode& aSource, Document& aOutput, ErrorResult& aRv) {
+    nsINode& aSource, bool aCloneSource, Document& aOutput, ErrorResult& aRv) {
   if (NS_WARN_IF(NS_FAILED(mCompileResult))) {
     aRv.Throw(mCompileResult);
     return nullptr;
@@ -736,8 +744,17 @@ already_AddRefed<DocumentFragment> txMozillaXSLTProcessor::TransformToFragment(
     return nullptr;
   }
 
-  UniquePtr<txXPathNode> sourceNode(
-      txXPathNativeNode::createXPathNode(&aSource));
+  nsCOMPtr<nsINode> source;
+  if (aCloneSource) {
+    source = aSource.CloneNode(true, aRv);
+    if (aRv.Failed()) {
+      return nullptr;
+    }
+  } else {
+    source = &aSource;
+  }
+
+  UniquePtr<txXPathNode> sourceNode(txXPathNativeNode::createXPathNode(source));
   if (!sourceNode) {
     aRv.Throw(NS_ERROR_OUT_OF_MEMORY);
     return nullptr;
@@ -1044,7 +1061,7 @@ nsresult txMozillaXSLTProcessor::ensureStylesheet() {
 
   NS_ENSURE_TRUE(mStylesheetDocument, NS_ERROR_NOT_INITIALIZED);
 
-  nsINode* style = mEmbeddedStylesheetRoot;
+  nsCOMPtr<nsINode> style = mEmbeddedStylesheetRoot;
   if (!style) {
     style = mStylesheetDocument;
   }
@@ -1084,8 +1101,8 @@ void txMozillaXSLTProcessor::ContentInserted(nsIContent* aChild) {
   mStylesheet = nullptr;
 }
 
-void txMozillaXSLTProcessor::ContentRemoved(nsIContent* aChild,
-                                            nsIContent* aPreviousSibling) {
+void txMozillaXSLTProcessor::ContentWillBeRemoved(nsIContent* aChild,
+                                                  const BatchRemovalState*) {
   mStylesheet = nullptr;
 }
 

@@ -42,7 +42,7 @@ function parseOptions(opts) {
   // Parse unit tests.
   let aliases = {"gtests": "gtest"};
   let allUnitTests = ["bogo", "crmf", "chains", "cipher", "db", "ec", "fips",
-                      "gtest", "interop", "lowhash", "merge", "sdr", "smime", "tools",
+                      "gtest", "lowhash", "merge", "sdr", "smime", "tools",
                       "ssl", "mpi", "scert", "spki", "policy", "tlsfuzzer"];
   let unittests = intersect(opts.unittests.split(/\s*,\s*/).map(t => {
     return aliases[t] || t;
@@ -57,7 +57,7 @@ function parseOptions(opts) {
   }
 
   // Parse tools.
-  let allTools = ["clang-format", "scan-build", "hacl", "ecckiila", "saw", "abi", "coverage"];
+  let allTools = ["clang-format", "scan-build", "hacl", "acvp", "saw", "abi", "coverage"];
   let tools = intersect(opts.tools.split(/\s*,\s*/), allTools);
 
   // If the given value is "all" run all tools.
@@ -123,10 +123,10 @@ function filter(opts) {
         "linux64-fuzz": "linux64",
         "linux64-make": "linux64",
         "linux-make": "linux32",
-        "win64-make": "windows2012-64",
-        "win-make": "windows2012-32",
-        "win64": "windows2012-64",
-        "win": "windows2012-32"
+        "win64-make": "windows2022-64",
+        "win-make": "windows2022-32",
+        "win64": "windows2022-64",
+        "win": "windows2022-32"
       };
 
       // Check the platform name.

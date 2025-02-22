@@ -17,7 +17,7 @@ const TIMESTAMP3 = (Date.now() - 123894) * 1000;
 
 function promiseOnVisitObserved() {
   return new Promise(res => {
-    let listener = new PlacesWeakCallbackWrapper(events => {
+    let listener = new PlacesWeakCallbackWrapper(() => {
       PlacesObservers.removeListener(["page-visited"], listener);
       res();
     });
@@ -179,9 +179,6 @@ add_task(async function test_invalid_records() {
           TIMESTAMP3 +
           ")"
       );
-      // Trigger the update to the moz_origin tables by deleting the added rows
-      // from moz_updateoriginsinsert_temp
-      await db.executeCached("DELETE FROM moz_updateoriginsinsert_temp");
       // Add the corresponding visit to retain database coherence.
       await db.execute(
         "INSERT INTO moz_historyvisits " +

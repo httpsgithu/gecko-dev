@@ -42,7 +42,16 @@ struct ServiceWorkerPushEventOpArgs {
   OptionalPushData data;
 };
 
-struct ServiceWorkerPushSubscriptionChangeEventOpArgs {};
+struct PushSubscriptionData {
+  nsString endpoint;
+  uint8_t[] rawP256dhKey;
+  uint8_t[] authSecret;
+  uint8_t[] appServerKey;
+};
+
+struct ServiceWorkerPushSubscriptionChangeEventOpArgs {
+  PushSubscriptionData? oldSubscription;
+};
 
 struct ServiceWorkerNotificationEventOpArgs {
   nsString eventName;
@@ -54,7 +63,6 @@ struct ServiceWorkerNotificationEventOpArgs {
   nsString tag;
   nsString icon;
   nsString data;
-  nsString behavior;
   nsString scope;
   uint32_t disableOpenClickDelay;
 };
@@ -69,7 +77,7 @@ struct ServiceWorkerExtensionAPIEventOpArgs {
 };
 
 struct ServiceWorkerMessageEventOpArgs {
-  ClientInfoAndState clientInfoAndState;
+  PostMessageSource source;
   ClonedOrErrorMessageData clonedData;
 };
 
@@ -104,6 +112,10 @@ struct ParentToChildServiceWorkerFetchEventOpArgs {
   ResponseEndArgs? preloadResponseEndArgs;
 };
 
+struct ServiceWorkerUpdateIsOnContentBlockingAllowListOpArgs {
+  bool onContentBlockingAllowList;
+};
+
 union ServiceWorkerOpArgs {
   ServiceWorkerCheckScriptEvaluationOpArgs;
   ServiceWorkerUpdateStateOpArgs;
@@ -115,6 +127,7 @@ union ServiceWorkerOpArgs {
   ServiceWorkerMessageEventOpArgs;
   ServiceWorkerExtensionAPIEventOpArgs;
   ParentToChildServiceWorkerFetchEventOpArgs;
+  ServiceWorkerUpdateIsOnContentBlockingAllowListOpArgs;
 };
 
 /**

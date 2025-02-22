@@ -124,8 +124,12 @@ async function testPropertyDeltas(
     info(
       `${msg} ${resizeCount}. resize event: ${stringifyState(currentSizeState)}`
     );
+    // Linux (only on automation, and only on X11) will sometimes get slightly
+    // inaccurate configures while moving the window.
+    const kSlop =
+      AppConstants.platform == "linux" && !SpecialPowers.isHeadless ? 1 : 0;
     let matchingIndex = validResizeStates.findIndex(state =>
-      sizeProps.every(p => state[p] == currentSizeState[p])
+      sizeProps.every(p => Math.abs(state[p] - currentSizeState[p]) <= kSlop)
     );
     if (matchingIndex < 0) {
       info(`${msg} Size state should have been one of:`);
@@ -140,8 +144,9 @@ async function testPropertyDeltas(
       return;
     }
 
-    ok(
-      matchingIndex >= 0,
+    Assert.greaterOrEqual(
+      matchingIndex,
+      0,
       `${msg} Valid intermediate state. Current: ` +
         stringifyState(currentSizeState)
     );
